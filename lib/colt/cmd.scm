@@ -26,6 +26,7 @@
                                  get-string-all))
   #:export (cmd
             wcmd
+            raw-cmd
             print-cmd-result
             cmd-result-map
             cmd-result-for-each
