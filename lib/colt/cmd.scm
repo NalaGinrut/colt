@@ -30,7 +30,8 @@
             print-cmd-result
             cmd-result-map
             cmd-result-for-each
-            cmd-result-any))
+            cmd-result-any
+            cmd-result-contents))
 
 (define-record-type cmd-result
   (fields pipe status contents))
@@ -93,8 +94,7 @@
     (get-lines contents ln)))
 
 (define (cmd-result-map proc cr)
-#t  
-)
+  (map proc (cmd-result-contents cr)))
 
 (define (cmd-result-for-each proc cr)
   #t)

@@ -16,12 +16,32 @@
 
 (define-module (colt git)
   #:use-module (artanis env)
+  #:use-module (artanis irregex)
   #:use-module (colt cmd)
-  #:use-module ((rnrs) #:select (define-record-type))
+  #:use-module ((rnrs) #:select (define-record-type get-string-all))
   #:use-module (ice-9 match)
   #:use-module (ice-9 rdelim)
   #:use-module (srfi srfi-1)
-  #:export ())
+  #:export (current-blog-repo
+            git-ls-tree
+            git/get-posts
+
+            post-meta-data
+            post-content
+            post-comment
+
+            meta-data-timestamp
+            meta-data-tags
+            meta-data-status
+            meta-data-title
+            meta-data-name
+            meta-data-comment-status
+
+            comment-timestamp
+            comment-author
+            comment-email
+            comment-site
+            comment-content))
 
 ;; NOTE: Must be absolute path
 (define current-blog-repo
@@ -30,24 +50,69 @@
 (define-record-type git-object
   (fields mode type oid file))
 
+(define-record-type post
+  (fields meta-data content comment))
+
+(define-record-type meta-data
+  (fields timestamp tags status title name comment-status))
+
 (define-record-type comment
   (fields timestamp author email site content))
 
 (define-syntax-rule (-> l)
-  (string-trim-both (cdr (string-split l #\:))))
+  (string-trim-both l))
 
 (define-syntax-rule (rdline port)
   (-> (read-line port)))
 
+(define *meta-data-res*
+  `((timestamp . ,(string->irregex "^timestamp:(.*)"))
+    (tags      . ,(string->irregex "^tags:(.*)"))
+    (status    . ,(string->irregex "^status:(.*)"))
+    (title     . ,(string->irregex "^title:(.*)"))
+    (name      . ,(string->irregex "^name:(.*)"))
+    (comment-status . ,(string->irregex "^comment_status:(.*)"))))
+
+(define *comment-res*
+  `((timestamp . ,(string->irregex "^timestamp:(.*)"))
+    (author    . ,(string->irregex "^author:(.*)"))
+    (email     . ,(string->irregex "^author_email:(.*)"))
+    (site      . ,(string->irregex "^author_url:(.*)"))
+    (content   . ,(string->irregex "^content:(.*)"))))
+
+(define (get-re re-table key)
+  (let ((re (assoc-ref re-table key)))
+    (if re
+        re
+        (throw 'artanis-err 500 get-re
+               "Invalid meta-data regex: ~a~%" re))))
+
+(define (get-value re-table key str)
+  (let* ((re (get-re re-table key))
+         (m (irregex-search re str)))
+    (if m
+        (irregex-match-substring m 1)
+        (throw 'artanis-err 500 get-value
+               "~a has parsed an invalid line ~a~%" key str))))
+
+(define (get-meta-data-value key port)
+  (-> (get-value *meta-data-res* key (read-line port))))
+
+(define (get-comment-value key port)
+  (-> (get-value *comment-res* key (read-line port))))
+
 (define (new-comment oid)
+  (define (get-comment-content port)
+    (read-line port)
+    (get-string-all port))
   (call-with-input-string
    (raw-cmd git show ,oid)
    (lambda (port)
-     (let ((timestamp (rdline port))
-           (author (rdline port))
-           (email (rdline port))
-           (site (rdline port))
-           (content (-> (read-string-all port))))
+     (let* ((timestamp (get-comment-value 'timestamp port))
+            (author (get-comment-value 'author port))
+            (email (get-comment-value 'email port))
+            (site (get-comment-value 'site port))
+            (content (get-comment-content port)))
        (make-comment timestamp
                      author
                      email
@@ -58,7 +123,7 @@
   (any (lambda (o) (and (string=? oid (git-object-oid o)) o)) obj-list))
 
 (define (get-object-by-name name obj-list)
-  (any (lambda (o) (and (string=? name (git-object-name o)) o)) obj-list))
+  (any (lambda (o) (and (string=? name (git-object-file o)) o)) obj-list))
 
 (define* (git-ls-tree #:key (branch "master"))
   (cmd-result-map
@@ -71,13 +136,21 @@
    (cmd git ls-tree ,branch)))
 
 (define (get-all-comment-oids coid)
-  (fold (lambda (x p)
-          (match x
-            (("tree" _) p)
-            ((oid) (cons x p))
-            (else (throw 'artanis-err 500 git/get-comments
-                         "Invalid comments tree ~a" x))))
-        (cmd-result-contents (cmd git show coid))))
+  (catch
+      'artanis-err
+    (lambda ()
+      (fold (lambda (x p)
+              (match x
+                (() p)
+                (("tree" _) p)
+                ((oid) (cons oid p))
+                (else (throw 'artanis-err 500 get-all-comment-oids
+                             "Invalid comments tree ~a" x))))
+            '()
+            (cmd-result-contents (cmd git show ,coid))))
+    ;; If any error, then there's no comments (just assuming)
+    ;; FIXME: Do it more elegantly.
+    (lambda e '())))
 
 (define (git/get-content oid)
   (let ((cid (format #f "~a:content" oid)))
@@ -95,11 +168,12 @@
     (call-with-input-string
      (raw-cmd git show ,moid)
      (lambda (port)
-       (let ((timestamp (rdline port))
-             (tags (->list (rdline port)))
-             (title (rdline port))
-             (name (rdline port))
-             (comment-status (rdline port)))
+       (let* ((timestamp (get-meta-data-value 'timestamp port))
+              (tags (->list (get-meta-data-value 'tags port)))
+              (status (get-meta-data-value 'status port))
+              (title (get-meta-data-value 'title port))
+              (name (get-meta-data-value 'name port))
+              (comment-status (get-meta-data-value 'comment-status port)))
          (make-meta-data timestamp
                          tags
                          title
@@ -108,10 +182,11 @@
   (let ((moid (format #f "~a:metadata" oid)))
     (parse-meta-data moid)))
 
-(define (get-post oid)
-  (let ((content (git/get-content oid))
-        (comments (git/get-comments oid))
-        (meta-data (git/get-meta-data oid)))
+(define (get-post gobj)
+  (let* ((oid (git-object-oid gobj))
+         (content (git/get-content oid))
+         (comments (git/get-comments oid))
+         (meta-data (git/get-meta-data oid)))
     (make-post meta-data content comments)))
 
 (define (git/get-posts)
