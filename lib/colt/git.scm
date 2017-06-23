@@ -29,6 +29,7 @@
             post-meta-data
             post-content
             post-comment
+            post-url-name
 
             meta-data-timestamp
             meta-data-tags
@@ -51,7 +52,7 @@
   (fields mode type oid file))
 
 (define-record-type post
-  (fields meta-data content comment))
+  (fields meta-data content comment url-name))
 
 (define-record-type meta-data
   (fields timestamp tags status title name comment-status))
@@ -184,10 +185,11 @@
 
 (define (get-post gobj)
   (let* ((oid (git-object-oid gobj))
+         (url-name (git-object-oid file))
          (content (git/get-content oid))
          (comments (git/get-comments oid))
          (meta-data (git/get-meta-data oid)))
-    (make-post meta-data content comments)))
+    (make-post meta-data content comments url-name)))
 
 (define (git/get-posts)
   (let ((ol (git-ls-tree)))
