@@ -18,6 +18,10 @@
 ;; This file is generated automatically by GNU Artanis.
 (define-artanis-controller articles) ; DO NOT REMOVE THIS LINE!!!
 
+(use-modules (app models posts)
+             (artanis irregex)
+             (web uri))
+
 (articles-define edit/:name
   (lambda (rc)
    "<h1>This is articles#edit</h1><p>Find me in app/views/articles/edit.html.tpl</p>"
@@ -26,9 +30,18 @@
   ;; (view-render "show" (the-environment))
   ))
 
-#;
-(get "/articles/:article-name" #:cache #t
-     (lambda (rc)
-    
-       )
-     )
+(define *url-name-re* (string->irregex "/articles/(.*)"))
+(define (->article-url-name path)
+  (define (normalized-path str)
+    (string-downcase (uri-encode str)))
+  (let ((m (irregex-search *url-name-re* path)))
+    (if m
+        (normalized-path (irregex-match-substring m 1))
+        (throw 'artanis-err 500 ->article-url-name
+               "BUG: If it's not matched then it shouldn't be here!~%~a~%"
+               path))))
+
+(get "/articles/(.*)" #:cache #t
+  (lambda (rc)
+    (let ((url-name (->article-url-name (rc-path rc))))
+      (:cache rc (get-one-article url-name)))))
