@@ -26,6 +26,9 @@
   #:export (current-blog-repo
             git-ls-tree
             git/get-posts
+            get-post-by-url-name
+            get-object-by-oid
+            get-object-by-name
 
             post-meta-data
             post-content
@@ -129,6 +132,9 @@
 (define (get-object-by-name name obj-list)
   (any (lambda (o) (and (string=? name (git-object-file o)) o)) obj-list))
 
+(define (get-post-by-url-name url-name post-list)
+  (any (lambda (p) (and (string=? url-name (post-url-name p)) p)) post-list))
+
 (define* (git-ls-tree #:key (branch "master"))
   (cmd-result-map
    (lambda (o)
@@ -200,12 +206,13 @@
     (map get-post ol)))
 
 (define (git-db-init)
-  (cmd git init --bare))
+  (cmd git init --bare --quiet))
 
 (define (enter-blog-repo)
   (let ((blog-repo (current-blog-repo)))
     (cmd mkdir -p blog-repo)
-    (chdir blog-repo)))
+    (chdir blog-repo)
+    (git-db-init)))
 
 (define (git/commit-change)
   #t)
