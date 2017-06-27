@@ -24,11 +24,13 @@
              (artanis utils)
              (artanis env)
              (artanis irregex)
-             (srfi srfi-1)
-             (rnrs))
+             (srfi srfi-1))
 
-(export try-to-get-page-from-cache
-        get-index-content
+(define get-string-all (@ (rnrs) get-string-all))
+(define get-string-n (@ (rnrs) get-string-n))
+
+(export get-index-content
+        get-one-article
         gen-cache-file)
 
 (define-syntax-rule (index-render e)
@@ -79,8 +81,13 @@
         (format #f "~a/tmp/cache/index.html" (current-toplevel))
         (format #f "~a/tmp/cache/~a.html" (current-toplevel) (-> path)))))
 
+(define *all-posts* #f)
+
 (define* (get-all-posts #:key (latest-top? #f))
-  ((if latest-top? reverse identity) (git/get-posts)))
+  (define return (if latest-top? reverse identity))
+  (if *all-posts*
+      (return *all-posts*)
+      (return (git/get-posts))))
 
 (define (get-posts-from-n-to-m n m posts-list)
   (list-head (list-tail posts-list n) m))
@@ -149,15 +156,38 @@
         '()
         (get-all-posts #:latest-top? #t)))
 
-(define (get-index-content rc)
-  (let ((blog-name (colt-conf-get 'blog-name))
-        (post-content (tpl->html (generate-index-content))))
-    (cache-this-page rc (index-render (the-environment)))))
+(define (gen-comments post)
+  (define-syntax-rule (->timestamp timestamp)
+    (timestamp->readable-date (string->number timestamp)))
+  (define-syntax-rule (->author author site)
+    `(a (@ (href ,site)) ,author))
+  (let ((comments (reverse (post-comment post)))) ; the latest will be the top
+    (map (lambda (c i)
+           (let ((timestamp (comment-timestamp c))
+                 (author (comment-author c))
+                 (site (comment-site c))
+                 (content (comment-content c)))
+             `(div (@ (class (format #f "comment-~a" i)))
+                   (div (@ (id "comment-timestamp")) ,(->timestamp timestamp))
+                   (div (@ (id "comment-author")) ,(->author author site))
+                   (div (@ (id "comment-content")) ,content))))
+         comments (iota (length comments) 1))))
+
+(define (get-one-article url-name)
+  (tpl->html
+   (let ((post (get-post-by-url-name url-name (get-all-posts))))
+     `(div (@ (class "article"))
+           ,(gen-one-post post)
+           (div (@ (class "comments"))
+                ,@(gen-comments post))))))
 
 (define (try-to-get-page-from-cache rc)
-  (catch 'artanis-err
-    (lambda () (:cache rc))
-    (lambda (k status . args)
-      (if (= status 404)
-          #f
-          (apply throw k status args)))))
+  (let ((cache-file (gen-cache-file (rc-path rc))))
+    (and (file-exists? cache-file)
+         (call-with-input-file cache-file get-string-all))))
+
+(define (get-index-content rc)
+  (or (try-to-get-page-from-cache rc)
+      (let ((blog-name (colt-conf-get 'blog-name))
+            (post-content (tpl->html (generate-index-content))))
+        (cache-this-page rc (index-render (the-environment))))))

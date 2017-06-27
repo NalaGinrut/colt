@@ -17,7 +17,6 @@
 
 (use-modules (app models posts))
 
-(get "/" #:cache `(public ,(gen-cache-file "/"))
+(get "/" #:cache #t
   (lambda (rc)
-    (or (try-to-get-page-from-cache rc)
-        (get-index-content rc))))
+    (:cache rc (get-index-content rc))))
