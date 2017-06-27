@@ -57,3 +57,6 @@ cscope.files
 *.d
 ltmain.sh
 libtool
+prv/blog
+.route
+tmp/*

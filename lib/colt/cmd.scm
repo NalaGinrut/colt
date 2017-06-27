@@ -31,6 +31,7 @@
             cmd-result-map
             cmd-result-for-each
             cmd-result-any
+            cmd-result-fold
             cmd-result-contents))
 
 (define-record-type cmd-result
@@ -47,7 +48,7 @@
       (lp (cons (irregex-split "[ \t]" (read-line pp)) ret))))))
 
 (define-syntax-rule (%cmd read-only? args ...)
-  (let* ((cmd (pk (format #f "~{~a~^ ~}" `(args ...))))
+  (let* ((cmd (format #f "~{~a~^ ~}" `(args ...)))
          (result (parse-from-pipe (open-pipe cmd OPEN_BOTH) read-only?)))
     (when (not (zero? (status:exit-val (cmd-result-status result))))
       (format #t "[ERROR] ~a~%" cmd)
@@ -56,7 +57,7 @@
 
 ;; TODO: handle exceptions
 (define-syntax-rule (%raw-cmd args ...)
-  (let* ((cmd (pk (format #f "~{~a~^ ~}" `(args ...))))
+  (let* ((cmd (format #f "~{~a~^ ~}" `(args ...)))
          (result (get-string-all (open-pipe cmd OPEN_BOTH))))
     result))
 
@@ -97,7 +98,10 @@
   (map proc (cmd-result-contents cr)))
 
 (define (cmd-result-for-each proc cr)
-  #t)
+  (for-each proc (cmd-result-contents cr)))
 
-(define (cmd-result-any proc init cr)
-  #t)
+(define (cmd-result-any proc cr)
+  (any proc (cmd-result-contents cr)))
+
+(define (cmd-result-fold proc init cr)
+  (fold proc init (cmd-result-contents cr)))

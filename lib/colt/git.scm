@@ -18,6 +18,7 @@
   #:use-module (artanis env)
   #:use-module (artanis irregex)
   #:use-module (colt cmd)
+  #:use-module (colt config)
   #:use-module ((rnrs) #:select (define-record-type get-string-all))
   #:use-module (ice-9 match)
   #:use-module (ice-9 rdelim)
@@ -42,11 +43,13 @@
             comment-author
             comment-email
             comment-site
-            comment-content))
+            comment-content
+
+            enter-blog-repo))
 
 ;; NOTE: Must be absolute path
-(define current-blog-repo
-  (make-parameter (format #f "~a/prv/blog.git" (current-toplevel))))
+(define (current-blog-repo)
+  (format #f "~a/~a" (current-toplevel) (colt-conf-get 'blog-repo)))
 
 (define-record-type git-object
   (fields mode type oid file))
@@ -177,6 +180,7 @@
               (comment-status (get-meta-data-value 'comment-status port)))
          (make-meta-data timestamp
                          tags
+                         status
                          title
                          name
                          comment-status)))))
@@ -185,7 +189,7 @@
 
 (define (get-post gobj)
   (let* ((oid (git-object-oid gobj))
-         (url-name (git-object-oid file))
+         (url-name (git-object-file gobj))
          (content (git/get-content oid))
          (comments (git/get-comments oid))
          (meta-data (git/get-meta-data oid)))
@@ -199,8 +203,9 @@
   (cmd git init --bare))
 
 (define (enter-blog-repo)
-  (cmd mkdir -p (current-blog-repo))
-  (chdir (current-blog-repo)))
+  (let ((blog-repo (current-blog-repo)))
+    (cmd mkdir -p blog-repo)
+    (chdir blog-repo)))
 
 (define (git/commit-change)
   #t)

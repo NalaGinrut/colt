@@ -14,7 +14,9 @@
 ;;  You should have received a copy of the GNU General Public License
 ;;  along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-'((blog-author NalaGinrut)
-  (github-url "https://github.com/NalaGinrut")
-  ;; Add your own config
-  )
+((blog-author "NalaGinrut")
+ (github-url "https://github.com/NalaGinrut")
+ (blog-name "Colt blog engine")
+ (blog-repo "prv/blog")
+ ;; Add your own config
+ )

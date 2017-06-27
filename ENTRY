@@ -9,6 +9,8 @@
  (init-server)
 
  (add-to-load-path (string-append (current-toplevel) "/lib"))
- ((@ (colt config) colt-init-config))
+ (use-modules (colt config) (colt git))
+ (colt-init-config)
+ (enter-blog-repo)
 
  ;; Put whatever you want to be called before server running here
