@@ -31,7 +31,8 @@
 
 (export get-index-content
         get-one-article
-        gen-cache-file)
+        gen-cache-file
+        get-article-content-by-name)
 
 (define-syntax-rule (index-render e)
   (let ((file (format #f "~a/app/views/index.html.tpl"
@@ -63,14 +64,6 @@
   (let ((check (meta-data-comment-status (post-meta-data p))))
     (string=? check open)))
 
-;; NOTE: We use 2-level caching here:
-;; * The 1st level is to cache content to a static HTML file.
-;;   Each time git repo changed, the cache file could be changed depends on situation.
-;;   It's reasonable to do so, because git-DB is differrent, it's half-static page,
-;;   which means the content in git-DB are static most of the time. Then we can make
-;;   the content as a static HTML file, and use Artanis' cache for static file caching.
-;;   It's NOT suitable to use Artanis' dynamic content caching.
-;; * The 2ed level is to take advantage of Artanis' cache by ETag.
 (define (gen-cache-file path)
   (define-syntax-rule (-> str)
     (string-trim-both
@@ -180,6 +173,10 @@
            ,(gen-one-post post)
            (div (@ (class "comments"))
                 ,@(gen-comments post))))))
+
+(define (get-article-content-by-name url-name)
+  (let ((post (get-post-by-url-name url-name (get-all-posts))))
+    (post-content post)))
 
 (define (try-to-get-page-from-cache rc)
   (let ((cache-file (gen-cache-file (rc-path rc))))
