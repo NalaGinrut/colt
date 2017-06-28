@@ -18,5 +18,6 @@
  (github-url "https://github.com/NalaGinrut")
  (blog-name "Colt blog engine")
  (blog-repo "prv/blog")
+ (admin-url "/admin") ; I recommend you change it with a metaphor you like
  ;; Add your own config
  )
