@@ -20,28 +20,56 @@
 
 (use-modules (app models posts)
              (artanis irregex)
-             (web uri))
+             (web uri)
+             (colt config))
 
-(articles-define edit/:name
-  (lambda (rc)
-   "<h1>This is articles#edit</h1><p>Find me in app/views/articles/edit.html.tpl</p>"
-  ;; TODO: add controller method `show'
-  ;; uncomment this line if you want to render view from template
-  ;; (view-render "show" (the-environment))
-  ))
 
 (define *url-name-re* (string->irregex "/articles/(.*)"))
-(define (->article-url-name path)
+(define *edit-re* (string->irregex "/articles/edit/(.*)"))
+(define (->article-url-name re path)
   (define (normalized-path str)
     (string-downcase (uri-encode str)))
-  (let ((m (irregex-search *url-name-re* path)))
+  (let ((m (irregex-search re path)))
     (if m
         (normalized-path (irregex-match-substring m 1))
         (throw 'artanis-err 500 ->article-url-name
                "BUG: If it's not matched then it shouldn't be here!~%~a~%"
                path))))
 
+(get (colt-conf-get 'admin-url)
+  ;;#:auth (post)
+  (lambda (rc)
+    #t))
+
+(define-syntax-rule (view-render method e)
+  (let ((file (format #f "~a/app/views/~a/~a.html.tpl"
+                      (current-toplevel) 'articles method)))
+    (cond
+     ((file-exists? file)
+      (let ((html ((@@ (artanis tpl) tpl-render-from-file) file e)))
+        (response-emit html)))
+     (else (response-emit "" #:status 404)))))
+
+(get "/articles/edit/(.*)"
+  ;;#:auth (todo)
+  (lambda (rc)
+    (let* ((url-name (->article-url-name *edit-re* (rc-path rc)))
+           (content (get-article-content-by-name url-name))
+           (blog-name (colt-conf-get 'blog-name))
+           (action "/article/modify"))
+      ((@@ (app controllers articles) view-render) "edit" (the-environment)))))
+
+(post "/articles/modify"
+  ;;#:auth (todo)
+  (lambda (rc)
+    #t))
+
+(post "/articles/new/"
+  ;;#:auth (todo)
+  (lambda (rc)
+    #t))
+
 (get "/articles/(.*)" #:cache #t
   (lambda (rc)
-    (let ((url-name (->article-url-name (rc-path rc))))
+    (let ((url-name (->article-url-name *url-name-re* (rc-path rc))))
       (:cache rc (get-one-article url-name)))))
