@@ -17,6 +17,11 @@
 
 (use-modules (app models posts))
 
+;; NOTE: We may use more efficient half-static cache, which saves dynamic
+;;       content to a static file, and use send-file for sending it. This
+;;       reduces half time for each request, but cache missed. So we just
+;;       use dynamic cache here, the first time fetching is half time slower
+;;       but then the cache works for client.
 (get "/" #:cache #t
   (lambda (rc)
     (:cache rc (get-index-content rc))))
