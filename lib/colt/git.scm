@@ -210,7 +210,7 @@
 
 (define (enter-blog-repo)
   (let ((blog-repo (current-blog-repo)))
-    (cmd mkdir -p blog-repo)
+    (cmd mkdir -p ,blog-repo)
     (chdir blog-repo)
     (git-db-init)))
 

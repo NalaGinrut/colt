@@ -36,11 +36,6 @@
                "BUG: If it's not matched then it shouldn't be here!~%~a~%"
                path))))
 
-(get (colt-conf-get 'admin-url)
-  ;;#:auth (post)
-  (lambda (rc)
-    #t))
-
 (define-syntax-rule (view-render method e)
   (let ((file (format #f "~a/app/views/~a/~a.html.tpl"
                       (current-toplevel) 'articles method)))
@@ -62,6 +57,7 @@
 (post "/articles/modify"
   ;;#:auth (todo)
   (lambda (rc)
+    
     #t))
 
 (post "/articles/new/"
